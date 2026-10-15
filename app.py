@@ -417,5 +417,11 @@ def javascript():
     return FileResponse(ROOT / "app.js", media_type="application/javascript")
 
 
+def validate_video_id(video_id: str) -> None:
+    """Validate a YouTube video identifier before making API calls."""
+    if not video_id or len(video_id) > 80 or any(ch not in "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_" for ch in video_id):
+        raise HTTPException(status_code=400, detail="Invalid video ID.")
+
+
 # Register the additional YouTube video and comments routes.
 import api_extensions  # noqa: E402,F401
