@@ -590,6 +590,81 @@ if(thumbPreviewForm) {
   });
 }
 
+
+const growthAuditForm=document.querySelector('#growth-audit-form');
+if(growthAuditForm){
+  const auditOut=document.querySelector('#growth-audit-results');
+  const escHtml=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  growthAuditForm.addEventListener('submit',event=>{
+    event.preventDefault();
+    const titleValue=document.querySelector('#growth-title').value.trim();
+    const desc=document.querySelector('#growth-description').value.trim();
+    const audience=document.querySelector('#growth-audience').value.trim();
+    const checks=[
+      {name:'Title is specific and readable',ok:titleValue.length>=25&&titleValue.length<=70,tip:'Aim for a clear, accurate title; keep the most important words near the start.'},
+      {name:'Audience / problem is clear',ok:audience.length>=8,tip:'State who this helps and the question it answers.'},
+      {name:'Description explains the video',ok:desc.length>=150,tip:'Add a useful summary, key details, relevant links and chapters when helpful. Avoid keyword stuffing.'},
+      {name:'Thumbnail ready',ok:document.querySelector('#growth-thumbnail').value==='yes',tip:'Use a readable, honest visual that complements rather than repeats the title.'},
+      {name:'Opening hook ready',ok:document.querySelector('#growth-hook').value==='yes',tip:'Deliver the promised value quickly; avoid long intros or misleading hooks.'},
+      {name:'Captions reviewed',ok:document.querySelector('#growth-captions').value==='yes',tip:'Correct auto-captions, especially names, formulas and technical terms.'},
+      {name:'Next viewing step ready',ok:document.querySelector('#growth-end-screen').value==='yes',tip:'Link to a genuinely related next video or series.'},
+      {name:'Playlist considered',ok:document.querySelector('#growth-playlist').value==='yes',tip:'Group videos into a useful sequence when there is a natural fit.'},
+      {name:'Facts and rights checked',ok:document.querySelector('#growth-facts').value==='yes',tip:'Check factual claims, copyright permissions, music, clips and thumbnail accuracy.'}
+    ];
+    const passed=checks.filter(x=>x.ok).length, score=Math.round(passed/checks.length*100);
+    const pending=checks.filter(x=>!x.ok);
+    auditOut.replaceChildren();
+    const summary=document.createElement('div');summary.className='card';
+    const heading=document.createElement('strong');heading.textContent='Readiness score: '+score+'/100';
+    const expl=document.createElement('p');expl.textContent=passed+' of '+checks.length+' checklist items passed. This is an editorial readiness score, not a ranking or performance prediction.';
+    const list=document.createElement('ul');
+    checks.forEach(item=>{const li=document.createElement('li');li.textContent=(item.ok?'✓ ':'○ ')+item.name+(item.ok?'':' — '+item.tip);list.append(li);});
+    summary.append(heading,expl,list);auditOut.append(summary);
+    try{localStorage.setItem('ytcc_growth_audit',JSON.stringify({title:titleValue,description:desc,audience,score,at:new Date().toISOString()}));}catch{}
+    showNotice('Video readiness audit complete. Fix the outstanding checklist items before publishing.','success');
+  });
+  document.querySelector('#growth-reset').addEventListener('click',()=>{growthAuditForm.reset();auditOut.replaceChildren();});
+}
+const growthMetricsForm=document.querySelector('#growth-metrics-form');
+if(growthMetricsForm) growthMetricsForm.addEventListener('submit',event=>{
+  event.preventDefault();
+  const impressions=Number(document.querySelector('#gm-impressions').value), views=Number(document.querySelector('#gm-views').value);
+  const avd=Number(document.querySelector('#gm-avd').value), length=Number(document.querySelector('#gm-length').value), subs=Number(document.querySelector('#gm-subs').value||0);
+  if(![impressions,views,avd,length,subs].every(Number.isFinite)||impressions<0||views<0||avd<0||length<=0||subs<0||views>impressions){
+    showNotice('Check the numbers: values must be non-negative, video length must be positive, and views from impressions cannot exceed impressions.','error');return;
+  }
+  const ctr=impressions?views/impressions*100:0, retention=avd/length*100, subRate=views?subs/views*100:0;
+  const results=document.querySelector('#growth-metrics-results');results.replaceChildren();
+  const card=document.createElement('div');card.className='card';
+  const title=document.createElement('strong');title.textContent='Your calculated signals';
+  const metrics=document.createElement('ul');
+  [
+    'Views from entered impressions: '+ctr.toFixed(2)+'% (not total channel CTR)',
+    'Average view duration / video length: '+retention.toFixed(1)+'%',
+    'Subscribers gained per entered view: '+subRate.toFixed(2)+'%'
+  ].forEach(t=>{const li=document.createElement('li');li.textContent=t;metrics.append(li);});
+  const guidance=document.createElement('p');
+  const tips=[];
+  if(impressions<100)tips.push('Sample is small; wait for more data before drawing conclusions.');
+  else if(ctr<3)tips.push('If this is below your channel’s usual range, compare thumbnail/title clarity and traffic sources before changing them.');
+  else tips.push('Compare this click rate with your own videos of similar topic and traffic source; there is no universal ideal CTR.');
+  if(retention<30)tips.push('Review the first 30 seconds and retention graph for slow introductions or a mismatch with the title promise.');
+  else tips.push('Inspect retention dips and spikes in Studio to learn which sections viewers skip or replay.');
+  if(subRate<0.5)tips.push('Try a clearer series promise and a relevant next-video path; avoid asking for subscriptions before delivering value.');
+  else tips.push('Check which traffic source and video topic brought subscribers, then build a useful follow-up.');
+  guidance.textContent=tips.join(' ');
+  card.append(title,metrics,guidance);results.append(card);
+  showNotice('Metric calculations complete. Use YouTube Studio retention and traffic-source reports for context.','success');
+});
+const weeklyChecks=document.querySelectorAll('[data-growth-check]');
+try{
+  const saved=JSON.parse(localStorage.getItem('ytcc_growth_weekly')||'{}');
+  weeklyChecks.forEach(input=>{input.checked=Boolean(saved[input.dataset.growthCheck]);input.addEventListener('change',()=>{
+    const current={};weeklyChecks.forEach(box=>current[box.dataset.growthCheck]=box.checked);
+    try{localStorage.setItem('ytcc_growth_weekly',JSON.stringify(current));}catch{}
+  });});
+}catch{}
+
 if (new URLSearchParams(location.search).has('oauth')) {
   const result = new URLSearchParams(location.search).get('oauth');
   showNotice(result === 'connected' ? 'Google authorization callback completed. Checking channel status…' : 'Google authorization was cancelled.', result === 'connected' ? 'success' : 'info');
