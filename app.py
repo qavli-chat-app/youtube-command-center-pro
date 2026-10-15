@@ -261,9 +261,15 @@ async def security_headers(request: Request, call_next):
 
 @app.get("/health")
 def health():
-    return {"status": "ok", "service": "youtube-command-center-pro-api", "oauth_configured": bool(
-        APP_SECRET and TOKEN_ENCRYPTION_KEY and GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI
-    )}
+    return {
+        "status": "ok",
+        "service": "youtube-command-center-pro-api",
+        "oauth_configured": bool(
+            APP_SECRET and TOKEN_ENCRYPTION_KEY and GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET and GOOGLE_REDIRECT_URI
+        ),
+        "database_backend": "postgresql" if DATABASE_URL else "sqlite_ephemeral",
+        "persistent_storage_configured": bool(DATABASE_URL),
+    }
 
 
 @app.get("/api/auth/start")
