@@ -316,29 +316,59 @@ def notifications(request: Request):
 
 @app.get("/api/research")
 def topic_research(request: Request, q: str, max_results: int = 10):
+    """Compare recent and high-view public search results and estimate view velocity."""
+    import math
+    from datetime import datetime, timezone
+
     sid = require_session(request)
     query = q.strip()
     if len(query) < 2 or len(query) > 100:
         raise HTTPException(status_code=400, detail="Research query must be between 2 and 100 characters.")
-    max_results = min(max(1, max_results), 25)
+    max_results = min(max(1, max_results), 15)
     yt = youtube_api(sid)
     try:
-        data = yt.search().list(part="snippet", q=query, type="video", maxResults=max_results,
-                                order="relevance", safeSearch="moderate").execute()
-        ids = [item.get("id", {}).get("videoId") for item in data.get("items", []) if item.get("id", {}).get("videoId")]
-        stats = yt.videos().list(part="statistics", id=",".join(ids)).execute() if ids else {"items": []}
-        stat_map = {item["id"]: item.get("statistics", {}) for item in stats.get("items", [])}
+        # Discover both recently published videos and high-view videos for comparison.
+        discovered = {}
+        for order in ("date", "viewCount"):
+            result = yt.search().list(part="snippet", q=query, type="video", maxResults=max_results,
+                                      order=order, safeSearch="moderate").execute()
+            for item in result.get("items", []):
+                video_id = item.get("id", {}).get("videoId")
+                if video_id:
+                    discovered.setdefault(video_id, item)
+        ids = list(discovered.keys())
+        stats = yt.videos().list(part="snippet,statistics,contentDetails", id=",".join(ids[:50])).execute() if ids else {"items": []}
         rows = []
-        for item in data.get("items", []):
-            video_id = item.get("id", {}).get("videoId")
-            if not video_id:
-                continue
+        now = datetime.now(timezone.utc)
+        for item in stats.get("items", []):
             snippet = item.get("snippet", {})
-            rows.append({"id": video_id, "title": snippet.get("title"), "description": snippet.get("description"),
-                         "channelTitle": snippet.get("channelTitle"), "publishedAt": snippet.get("publishedAt"),
-                         "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url"),
-                         "viewCount": stat_map.get(video_id, {}).get("viewCount")})
-        audit(sid, "topic_research", query)
-        return {"query": query, "items": rows, "note": "Search results and public counts are snapshots, not private competitor analytics or predictions."}
+            metrics = item.get("statistics", {})
+            published_raw = snippet.get("publishedAt")
+            try:
+                published = datetime.fromisoformat(published_raw.replace("Z", "+00:00"))
+                age_hours = max(1.0, (now - published).total_seconds() / 3600)
+            except (ValueError, TypeError, AttributeError):
+                age_hours = 24 * 30
+            views = int(metrics.get("viewCount", 0))
+            likes = int(metrics.get("likeCount", 0))
+            comments = int(metrics.get("commentCount", 0))
+            views_per_day = round(views / max(age_hours / 24, 1 / 24), 1)
+            engagement = round(((likes + comments) / views) * 100, 2) if views else 0
+            trend_score = round(math.log1p(views_per_day) * 10 + min(engagement, 20) * 1.5, 1)
+            rows.append({
+                "id": item["id"], "title": snippet.get("title"), "description": snippet.get("description"),
+                "channelTitle": snippet.get("channelTitle"), "publishedAt": published_raw,
+                "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url"),
+                "viewCount": str(views), "likeCount": str(likes), "commentCount": str(comments),
+                "viewsPerDay": views_per_day, "engagementRate": engagement, "trendScore": trend_score,
+                "ageHours": round(age_hours, 1),
+            })
+        rows.sort(key=lambda row: (row["trendScore"], row["viewsPerDay"]), reverse=True)
+        audit(sid, "topic_research_deep", query)
+        return {
+            "query": query, "items": rows,
+            "method": "Compared recent uploads with high-view search results; ranked by public view velocity and visible engagement.",
+            "note": "Trend score is a relative heuristic for these results, not a prediction or guarantee. Search results are not all of YouTube; counts may be delayed. Two search requests use YouTube API quota."
+        }
     except HttpError as exc:
-        raise HTTPException(status_code=502, detail={"code": "RESEARCH_API_ERROR", "message": "YouTube search failed. Check API quota and permissions.", "status": exc.resp.status})
+        raise HTTPException(status_code=502, detail={"code": "RESEARCH_API_ERROR", "message": "YouTube trend research failed. Check OAuth, API quota, and channel permissions.", "status": exc.resp.status})
