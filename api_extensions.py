@@ -1,5 +1,6 @@
 from typing import Any
 from fastapi import File, Form, HTTPException, Request, UploadFile
+from starlette.concurrency import run_in_threadpool
 from googleapiclient.errors import HttpError
 from googleapiclient.http import MediaFileUpload
 from app import app, audit, db, require_session, validate_video_id, youtube_api
@@ -15,6 +16,16 @@ from fastapi import File, Form, UploadFile
 from googleapiclient.http import MediaFileUpload
 
 MAX_UPLOAD_BYTES = int(os.getenv("MAX_UPLOAD_BYTES", str(256 * 1024 * 1024)))
+
+
+def _perform_resumable_upload(sid: str, body: dict[str, Any], path: str, mime_type: str) -> dict[str, Any]:
+    yt = youtube_api(sid)
+    media = MediaFileUpload(path, chunksize=8 * 1024 * 1024, resumable=True, mimetype=mime_type)
+    call = yt.videos().insert(part="snippet,status", body=body, media_body=media)
+    response = None
+    while response is None:
+        _, response = call.next_chunk()
+    return response
 
 
 def validate_video_id(video_id: str) -> None:
@@ -133,17 +144,12 @@ async def upload_video(request: Request, file: UploadFile = File(...), title: st
             raise HTTPException(status_code=400, detail="The selected file is empty.")
         with db() as con:
             con.execute("UPDATE upload_jobs SET status='uploading', updated_at=? WHERE id=?", (int(time.time()), job_id))
-        yt = youtube_api(sid)
         status_body = {"privacyStatus": "private", "selfDeclaredMadeForKids": False}
         if scheduled_at:
             status_body["publishAt"] = scheduled_at.isoformat().replace("+00:00", "Z")
         body = {"snippet": {"title": title.strip(), "description": description, "tags": parsed_tags[:500], "categoryId": category_id},
                 "status": status_body}
-        media = MediaFileUpload(temp_path, chunksize=8 * 1024 * 1024, resumable=True, mimetype=file.content_type)
-        call = yt.videos().insert(part="snippet,status", body=body, media_body=media)
-        response = None
-        while response is None:
-            _, response = call.next_chunk()
+        response = await run_in_threadpool(_perform_resumable_upload, sid, body, temp_path, file.content_type)
         video_id = response["id"]
         with db() as con:
             con.execute("UPDATE upload_jobs SET status='completed', video_id=?, updated_at=? WHERE id=?",
