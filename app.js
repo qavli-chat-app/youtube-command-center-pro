@@ -128,6 +128,45 @@ function renderVideoRows(container, videos) {
     const meta = document.createElement('small'); meta.textContent = (video.publishedAt ? new Date(video.publishedAt).toLocaleDateString() : 'Date unavailable') + ' · ' + (video.viewCount ? Number(video.viewCount).toLocaleString() + ' views' : 'Views unavailable');
     info.append(name, meta);
     const badge = document.createElement('span'); badge.className = 'pill'; badge.textContent = video.privacyStatus || video.uploadStatus || 'Unknown';
+    const edit = document.createElement('button'); edit.className = 'btn'; edit.textContent = 'Edit details'; edit.style.marginTop = '8px';
+    edit.addEventListener('click', async () => {
+      const nextTitle = prompt('Edit video title:', video.title || '');
+      if (nextTitle === null) return;
+      const nextDescription = prompt('Edit video description:', video.description || '');
+      if (nextDescription === null) return;
+      const tagsText = prompt('Tags as comma-separated words:', (video.tags || []).join(', '));
+      if (tagsText === null) return;
+      if (!nextTitle.trim() || nextTitle.length > 100) { showNotice('Title is required and must be 100 characters or fewer.', 'error'); return; }
+      if (!confirm('Save these metadata changes to YouTube video "' + video.title + '"?')) return;
+      try {
+        await api('/api/videos/' + encodeURIComponent(video.id), {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({title:nextTitle.trim(),description:nextDescription,tags:tagsText.split(',').map(t=>t.trim()).filter(Boolean)})});
+        showNotice('YouTube confirmed the metadata update.', 'success'); loadVideos(videoSearch?.value || '');
+      } catch (error) { showNotice(error.message, 'error'); }
+    });
+    const visibility = document.createElement('button'); visibility.className = 'btn'; visibility.textContent = 'Visibility'; visibility.style.marginTop = '8px';
+    visibility.addEventListener('click', async () => {
+      const next = prompt('Choose visibility: private, unlisted, or public. Current: ' + video.privacyStatus, video.privacyStatus || 'private');
+      if (next === null) return;
+      if (!['private','unlisted','public'].includes(next)) { showNotice('Use private, unlisted, or public.', 'error'); return; }
+      if (!confirm('Change visibility of "' + video.title + '" to ' + next + '?')) return;
+      try { await api('/api/videos/' + encodeURIComponent(video.id) + '/visibility', {method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify({privacyStatus:next})}); showNotice('YouTube confirmed the visibility change.', 'success'); loadVideos(videoSearch?.value || ''); }
+      catch (error) { showNotice(error.message, 'error'); }
+    });
+    const thumbnail = document.createElement('button'); thumbnail.className = 'btn'; thumbnail.textContent = 'Thumbnail'; thumbnail.style.marginTop = '8px';
+    thumbnail.addEventListener('click', () => {
+      const picker = document.createElement('input'); picker.type = 'file'; picker.accept = 'image/jpeg,image/png';
+      picker.addEventListener('change', async () => {
+        const image = picker.files[0]; if (!image) return;
+        if (image.size > 2 * 1024 * 1024) { showNotice('Thumbnail must be 2 MB or smaller.', 'error'); return; }
+        if (!confirm('Replace the thumbnail for "' + video.title + '"?')) return;
+        const form = new FormData(); form.append('file', image);
+        try { await api('/api/videos/' + encodeURIComponent(video.id) + '/thumbnail', {method:'POST',body:form}); showNotice('YouTube confirmed the thumbnail update.', 'success'); loadVideos(videoSearch?.value || ''); }
+        catch (error) { showNotice(error.message, 'error'); }
+      });
+      picker.click();
+    });
+    const controls = document.createElement('div'); controls.className = 'video-controls'; controls.append(edit, visibility, thumbnail);
+    info.append(controls);
     row.append(thumb, info, badge); container.append(row);
   });
 }
