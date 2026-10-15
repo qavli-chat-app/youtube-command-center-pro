@@ -76,7 +76,7 @@ Requirements: Python 3.11+.
 ## Production configuration
 
 - Set `APP_SECRET`, `TOKEN_ENCRYPTION_KEY`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, and optionally `FRONTEND_ORIGIN` as server-side environment variables.
-- Set `DATABASE_PATH` to durable storage. The default SQLite file is not safe for an ephemeral host because sessions, encrypted tokens, audit logs, and upload history can be lost on restart/redeploy.
+- For durable production storage, set `DATABASE_URL` to the Supabase PostgreSQL connection string (prefer the Supavisor session/transaction pooler URI provided by the Supabase dashboard, with SSL required). The app creates its required tables automatically and stores OAuth states, encrypted channel credentials, audit logs, and upload-job history in PostgreSQL. Keep the database password only in Railway Variables; never commit it. If `DATABASE_URL` is absent, local development/CI falls back to SQLite, which is ephemeral on Railway.
 - Set `MAX_UPLOAD_BYTES` to a limit compatible with your host and available disk/memory.
 - Use HTTPS and exact OAuth callback URLs.
 - Monitor `/health`, application logs, Google API quota, and OAuth failures.
