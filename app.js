@@ -368,22 +368,40 @@ if (seoForm) seoForm.addEventListener('submit', event => {
   const topic = document.querySelector('#seo-topic').value.trim();
   const audience = document.querySelector('#seo-audience').value.trim();
   const target = document.querySelector('#seo-results'); target.replaceChildren();
-  const titles = [
-    topic + ' | Complete Guide for Beginners',
-    'Learn ' + topic + ' Step by Step',
-    topic + ' Explained with Examples'
+  const words = topic.toLowerCase().split(/[^a-z0-9]+/).filter(w => w.length > 2);
+  const unique = values => [...new Set(values.map(v => v.trim()).filter(Boolean))];
+  const titleIdeas = unique([
+    topic + ' Explained Simply | Complete Guide',
+    'How to ' + topic + ' Step by Step',
+    topic + ': 7 Important Things You Should Know',
+    'Stop Making These ' + topic + ' Mistakes',
+    topic + ' Tutorial with Examples'
+  ]).map((v, i) => (i + 1) + '. ' + v.slice(0, 100));
+  const hashtags = unique(['#' + words.slice(0, 3).join(''), '#YouTubeTips', '#LearnWithMe', ...(audience.toLowerCase().includes('math') ? ['#Maths','#Education'] : []), ...(audience.toLowerCase().includes('urdu') ? ['#Urdu','#Pakistan'] : [])]).slice(0, 8).join(' ');
+  const tags = unique([...words, ...words.map(w => w + ' tutorial'), topic.toLowerCase(), 'how to ' + topic.toLowerCase(), 'explained', 'step by step', 'beginner guide', 'tutorial', 'education']).slice(0, 25).join(', ');
+  const description = topic + '\n\nIn this video, you will learn about ' + topic + ' with clear explanations and practical examples.\n\n📌 What you will learn:\n• The core idea and important concepts\n• A simple step-by-step explanation\n• Common mistakes and how to avoid them\n• Examples and key takeaways\n\n' + (audience ? '🎯 For: ' + audience + '\n\n' : '') + hashtags + '\n\nIf this video helps you, like it, share it, and subscribe for more useful videos. Please check all facts and replace any generic points with the exact content of your video before publishing.';
+  const hook = '“Before you try ' + topic + ', make sure you understand this one important point…”';
+  const outline = '0:00 — Strong hook: show the result or problem\n0:15 — Promise: explain exactly what viewers will learn\n0:30 — Step 1: explain the basics\n1:30 — Step 2: demonstrate with a real example\n2:30 — Common mistake and correction\n3:15 — Quick recap / result\n3:40 — Ask one specific question and invite viewers to watch the next related video';
+  const thumbnail = 'Use one clear subject, high contrast, 2–4 readable words, and a visual that honestly represents: ' + topic + '. Avoid clutter and misleading claims.';
+  const pinned = 'Which part of ' + topic + ' should I explain next? Tell me in the comments.';
+  const cards = [
+    ['Title options (choose one)', titleIdeas.join('\n')],
+    ['SEO description + hashtags', description],
+    ['Tags / keywords', tags],
+    ['Opening hook', hook],
+    ['Video structure / chapters', outline],
+    ['Thumbnail concept', thumbnail],
+    ['Pinned comment', pinned]
   ];
-  const description = topic + '\n\nIn this lesson, we cover:\n• Key concepts and explanations\n• Step-by-step examples\n• Practice and revision points\n\n' + (audience ? 'Made for: ' + audience + '\n\n' : '') + 'Subscribe for more educational videos. Check the lesson and all details before publishing.';
-  const tags = [...new Set(topic.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).concat(['tutorial','explained','learning']))].slice(0,15).join(', ');
-  [['Title ideas', titles.join('\n')],['Description draft',description],['Tag ideas',tags]].forEach(([label,value]) => {
+  cards.forEach(([label, value]) => {
     const card=document.createElement('div'); card.className='card';
     const h=document.createElement('strong'); h.textContent=label;
-    const area=document.createElement('textarea'); area.className='text-input'; area.rows=label==='Description draft'?7:4; area.value=value;
+    const area=document.createElement('textarea'); area.className='text-input'; area.rows=label.includes('description')?9:label.includes('structure')?7:4; area.value=value;
     const copy=document.createElement('button'); copy.className='btn'; copy.textContent='Copy';
     copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(area.value);showNotice(label+' copied.','success');}catch{area.select();showNotice('Select the text and copy it manually.');}});
     card.append(h,area,copy); target.append(card);
   });
-  showNotice('Draft suggestions created locally. Review accuracy and relevance before use.');
+  showNotice('Complete SEO pack drafted locally. These are templates, not live search-volume data or guaranteed rankings; verify accuracy before publishing.');
 });
 const researchForm = document.querySelector('#research-form');
 if (researchForm) researchForm.addEventListener('submit', async event => {
