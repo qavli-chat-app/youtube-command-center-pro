@@ -8,6 +8,7 @@ from datetime import datetime, timezone, date
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
+from urllib.request import Request as UrlRequest, urlopen
 
 from cryptography.fernet import Fernet, InvalidToken
 from fastapi import FastAPI, HTTPException, Request, Response
@@ -267,9 +268,24 @@ def auth_status(request: Request):
 def auth_disconnect(request: Request, response: Response):
     sid = require_session(request)
     with db() as con:
+        row = con.execute("SELECT encrypted_credentials FROM connections WHERE session_id=?", (sid,)).fetchone()
+    revoke_result = "not_attempted"
+    if row and TOKEN_ENCRYPTION_KEY:
+        try:
+            stored = decrypt(row["encrypted_credentials"])
+            token = stored.get("refresh_token") or stored.get("token")
+            if token:
+                body = urlencode({"token": token}).encode()
+                revoke_request = UrlRequest("https://oauth2.googleapis.com/revoke", data=body,
+                                            headers={"Content-Type": "application/x-www-form-urlencoded"}, method="POST")
+                with urlopen(revoke_request, timeout=5) as revoke_response:
+                    revoke_result = "revoked" if revoke_response.status in (200, 204) else "failed"
+        except Exception:
+            revoke_result = "failed"
+    with db() as con:
         con.execute("DELETE FROM connections WHERE session_id=?", (sid,))
-    audit(sid, "oauth_disconnected")
-    response = Response(content=json.dumps({"connected": False}), media_type="application/json")
+    audit(sid, "oauth_disconnected", "google_token_" + revoke_result)
+    response = Response(content=json.dumps({"connected": False, "googleTokenRevocation": revoke_result}), media_type="application/json")
     response.delete_cookie(COOKIE_NAME, httponly=True, secure=True, samesite="lax")
     return response
 
