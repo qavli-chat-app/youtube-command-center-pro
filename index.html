@@ -1,14 +1,64 @@
 <!doctype html>
 <html lang="en">
-  <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="theme-color" content="#0b0c12" />
-    <meta name="description" content="A focused, secure YouTube channel management command center." />
-    <title>YouTube Command Center PRO</title>
-  </head>
-  <body>
-    <div id="root"></div>
-    <script type="module" src="/src/main.jsx"></script>
-  </body>
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#0b0c12">
+<meta name="description" content="A focused, secure YouTube channel management command center.">
+<title>YouTube Command Center PRO</title>
+<link rel="stylesheet" href="/app.css">
+</head>
+<body>
+<div class="app">
+<aside class="sidebar">
+  <div class="brand"><div class="brand-mark">▶</div><div>YouTube Command<br>Center <span style="color:#a994ff">PRO</span></div></div>
+  <div class="eyebrow">Workspace</div>
+  <nav class="nav" aria-label="Main navigation">
+    <button class="active" data-page="Overview"><span class="nav-icon">⌂</span>Overview</button>
+    <button data-page="My Videos"><span class="nav-icon">▣</span>My Videos</button>
+    <button data-page="Upload Video"><span class="nav-icon">↑</span>Upload Video</button>
+    <button data-page="Scheduled Uploads"><span class="nav-icon">◷</span>Scheduled Uploads</button>
+    <button data-page="Analytics"><span class="nav-icon">▥</span>Analytics</button>
+    <button data-page="SEO Studio"><span class="nav-icon">⌕</span>SEO Studio</button>
+    <button data-page="Thumbnail Studio"><span class="nav-icon">▧</span>Thumbnail Studio</button>
+    <button data-page="Topic Research"><span class="nav-icon">✧</span>Topic Research</button>
+    <button data-page="Comments & Moderation"><span class="nav-icon">☷</span>Comments &amp; Moderation</button>
+    <button data-page="Automation Rules"><span class="nav-icon">⚙</span>Automation Rules</button>
+    <button data-page="Security & API"><span class="nav-icon">♢</span>Security &amp; API</button>
+  </nav>
+  <div class="sidebar-foot"><strong>Secure by design</strong>Official YouTube APIs only. OAuth tokens must stay on the backend.</div>
+</aside>
+<main class="main">
+  <div class="topbar"><div class="crumb">WORKSPACE / <span id="page-title">Overview</span></div><div class="top-actions"><span class="status">● Setup required</span><div class="avatar">YC</div></div></div>
+  <div class="heading"><div><h1 id="headline">Your YouTube command center</h1><p>One focused workspace for your channel, videos, and content workflow.</p></div><div class="actions"><button class="btn" id="refresh-button">↻ Refresh</button><button class="btn primary" id="connect-button">Connect YouTube</button></div></div>
+  <div class="notice" id="notice"><b>Setup preview:</b> The dashboard shell is live in demo mode. Connect secure Google OAuth and the official YouTube APIs before displaying live data or enabling channel changes.</div>
+  <section class="panel-page" id="panel-overview">
+    <div class="grid">
+      <article class="card"><span class="stat-icon">◉</span><div class="stat-label">Subscribers</div><div class="stat-value">—</div><div class="stat-foot">Waiting for channel connection</div></article>
+      <article class="card"><span class="stat-icon">▶</span><div class="stat-label">Total views</div><div class="stat-value">—</div><div class="stat-foot">Live analytics not connected</div></article>
+      <article class="card"><span class="stat-icon">▣</span><div class="stat-label">Published videos</div><div class="stat-value">—</div><div class="stat-foot">No live channel data loaded</div></article>
+      <article class="card"><span class="stat-icon">◷</span><div class="stat-label">Scheduled uploads</div><div class="stat-value">0</div><div class="stat-foot">Persistent scheduler not configured</div></article>
+    </div>
+    <div class="section-title"><h2>Channel performance</h2><span>Real metrics appear after OAuth setup</span></div>
+    <div class="split">
+      <article class="card"><div class="stat-label">Views over time</div><div class="empty"><strong>Connect your channel to begin</strong>Analytics will be fetched from the official YouTube Analytics API. No sample values are shown as real data.</div></article>
+      <article class="card"><div class="stat-label">Setup checklist</div><div class="list" style="margin-top:18px"><div class="task"><span class="task-dot"></span><div>Configure Google Cloud APIs<small>YouTube Data API v3 and Analytics API</small></div></div><div class="task"><span class="task-dot"></span><div>Secure backend OAuth flow<small>Store secrets and refresh tokens server-side</small></div></div><div class="task"><span class="task-dot"></span><div>Connect persistent job storage<small>Required for reliable scheduled uploads</small></div></div><div class="task"><span class="task-dot"></span><div>Run mocked API and security tests<small>Before enabling real channel write actions</small></div></div></div></article>
+    </div>
+    <div class="section-title"><h2>Recent videos</h2><span class="pill demo">API not connected</span></div>
+    <article class="card"><div class="empty"><strong>No channel videos loaded</strong>After connecting, your video library will show real titles, visibility, publish dates, and available actions.</div></article>
+  </section>
+  <section class="panel-page" id="panel-my-videos" hidden><article class="card"><div class="empty"><strong>My Videos</strong>Live search, filters, metadata edits, visibility changes, and thumbnail updates require authenticated YouTube API access. Destructive actions will require confirmation.</div></article></section>
+  <section class="panel-page" id="panel-upload-video" hidden><article class="card"><div class="empty"><strong>Upload Video</strong>Upload workflow is not enabled yet. Planned safeguards: private-by-default visibility, progress reporting, retry handling, duplicate protection, and confirmation before publishing.</div><button class="btn primary" id="upload-button">Check upload setup</button></article></section>
+  <section class="panel-page" id="panel-scheduled-uploads" hidden><article class="card"><div class="empty"><strong>Scheduled Uploads</strong>Scheduling requires a persistent job store and background worker. A sleeping or ephemeral free web instance alone is not reliable enough for scheduled publishing.</div></article></section>
+  <section class="panel-page" id="panel-analytics" hidden><article class="card"><div class="empty"><strong>Analytics</strong>Live channel metrics and supported reports will be requested from YouTube Analytics API after OAuth and scopes are configured. No ranking or growth guarantees.</div></article></section>
+  <section class="panel-page" id="panel-seo-studio" hidden><article class="card"><div class="empty"><strong>SEO Studio</strong>Draft titles, descriptions, and tags for manual review. Recommendations will not claim guaranteed rankings or automate spam.</div></article></section>
+  <section class="panel-page" id="panel-thumbnail-studio" hidden><article class="card"><div class="empty"><strong>Thumbnail Studio</strong>Thumbnail planning and preview will be added here. Uploading a thumbnail will only be reported successful after the API confirms it.</div></article></section>
+  <section class="panel-page" id="panel-topic-research" hidden><article class="card"><div class="empty"><strong>Topic Research</strong>Research will use permitted public YouTube data. Private competitor analytics will not be fabricated or presented as accessible.</div></article></section>
+  <section class="panel-page" id="panel-comments-&-moderation" hidden><article class="card"><div class="empty"><strong>Comments &amp; Moderation</strong>Comment tools require the appropriate official API permissions. Bulk or destructive actions will include a review and confirmation step.</div></article></section>
+  <section class="panel-page" id="panel-automation-rules" hidden><article class="card"><div class="empty"><strong>Automation Rules</strong>Automation will remain opt-in, auditable, and pausable. Actions that publish or delete content require explicit user approval.</div></article></section>
+  <section class="panel-page" id="panel-security-&-api" hidden><article class="card"><div class="empty"><strong>Security &amp; API</strong>OAuth status, API health, permission scopes, audit logs, and data deletion controls will appear here after the backend is implemented.</div></article></section>
+  <div class="footer">YouTube Command Center PRO · Initial scaffold · Live API, OAuth, and production deployment not yet verified.</div>
+</main>
+</div>
+<script src="/app.js" defer></script>
+</body>
 </html>
