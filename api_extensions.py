@@ -115,7 +115,7 @@ async def upload_video(request: Request, file: UploadFile = File(...), title: st
     now = int(time.time())
     with db() as con:
         con.execute("INSERT INTO upload_jobs(id,session_id,status,payload,created_at,updated_at) VALUES(?,?,?,?,?,?)",
-                    (job_id, sid, "receiving", json.dumps({"title": title, "filename": Path(file.filename).name}), now, now))
+                    (job_id, sid, "receiving", json.dumps({"title": title, "filename": Path(file.filename).name, "scheduledPublishAt": scheduled_at.isoformat() if scheduled_at else None}), now, now))
     temp_path = None
     total = 0
     try:
