@@ -40,6 +40,8 @@ navItems.forEach(item => item.addEventListener('click', () => {
   if (item.dataset.page === 'Notifications') loadNotifications();
   if (item.dataset.page === 'Channel Settings') loadChannelSettings();
   if (item.dataset.page === 'Security & API') renderSecurityStatus();
+  if (item.dataset.page === 'Scheduled Uploads') loadUploadJobs();
+  if (item.dataset.page === 'Analytics') document.querySelector('#analytics-form')?.requestSubmit();
 }));
 
 async function loadConnectionStatus() {
@@ -291,6 +293,97 @@ async function loadNotifications() {
     });
   } catch (error) { target.textContent = error.message; }
 }
+
+async function loadUploadJobs() {
+  const target = document.querySelector('#upload-job-list');
+  if (!target) return;
+  target.textContent = 'Loading upload history…';
+  try {
+    const data = await api('/api/upload-jobs');
+    target.replaceChildren();
+    if (!data.items.length) { target.textContent = 'No upload jobs yet.'; return; }
+    data.items.forEach(job => {
+      const row = document.createElement('div'); row.className = 'task';
+      const dot = document.createElement('span'); dot.className = 'task-dot';
+      const text = document.createElement('div');
+      const scheduled = job.payload?.scheduledPublishAt ? ' · Scheduled ' + new Date(job.payload.scheduledPublishAt).toLocaleString() : '';
+      text.textContent = (job.payload?.title || 'Video upload') + ' · ' + job.status + scheduled + (job.video_id ? ' · Video ID ' + job.video_id : '') + (job.error ? ' · ' + job.error : '');
+      row.append(dot, text); target.append(row);
+    });
+  } catch (error) { target.textContent = error.message; }
+}
+const analyticsForm = document.querySelector('#analytics-form');
+if (analyticsForm) {
+  const toDateInput = date => [date.getFullYear(), String(date.getMonth()+1).padStart(2,'0'), String(date.getDate()).padStart(2,'0')].join('-');
+  const today = new Date(); const start = new Date(); start.setDate(today.getDate()-28);
+  document.querySelector('#analytics-start').value = toDateInput(start);
+  document.querySelector('#analytics-end').value = toDateInput(today);
+  analyticsForm.addEventListener('submit', async event => {
+    event.preventDefault();
+    const target = document.querySelector('#analytics-results'); target.textContent = 'Loading official YouTube Analytics…';
+    const from = document.querySelector('#analytics-start').value, to = document.querySelector('#analytics-end').value;
+    try {
+      const data = await api('/api/analytics?start_date=' + encodeURIComponent(from) + '&end_date=' + encodeURIComponent(to));
+      target.replaceChildren();
+      if (!data.rows?.length) { target.textContent = 'No analytics rows returned for this range.'; return; }
+      const table = document.createElement('table'); table.className = 'data-table';
+      const head = document.createElement('tr'); (data.headers || []).forEach(value => { const th=document.createElement('th'); th.textContent=value; head.append(th); }); table.append(head);
+      data.rows.forEach(row => { const tr=document.createElement('tr'); row.forEach(value => { const td=document.createElement('td'); td.textContent=String(value); tr.append(td); }); table.append(tr); });
+      target.append(table);
+    } catch (error) { target.textContent = error.message; showNotice(error.message, 'error'); }
+  });
+}
+const seoForm = document.querySelector('#seo-form');
+if (seoForm) seoForm.addEventListener('submit', event => {
+  event.preventDefault();
+  const topic = document.querySelector('#seo-topic').value.trim();
+  const audience = document.querySelector('#seo-audience').value.trim();
+  const target = document.querySelector('#seo-results'); target.replaceChildren();
+  const titles = [
+    topic + ' | Complete Guide for Beginners',
+    'Learn ' + topic + ' Step by Step',
+    topic + ' Explained with Examples'
+  ];
+  const description = topic + '\\n\\nIn this lesson, we cover:\\n• Key concepts and explanations\\n• Step-by-step examples\\n• Practice and revision points\\n\\n' + (audience ? 'Made for: ' + audience + '\\n\\n' : '') + 'Subscribe for more educational videos. Check the lesson and all details before publishing.';
+  const tags = [...new Set(topic.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).concat(['tutorial','explained','learning']))].slice(0,15).join(', ');
+  [['Title ideas', titles.join('\\n')],['Description draft',description],['Tag ideas',tags]].forEach(([label,value]) => {
+    const card=document.createElement('div'); card.className='card';
+    const h=document.createElement('strong'); h.textContent=label;
+    const area=document.createElement('textarea'); area.className='text-input'; area.rows=label==='Description draft'?7:4; area.value=value;
+    const copy=document.createElement('button'); copy.className='btn'; copy.textContent='Copy';
+    copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(area.value);showNotice(label+' copied.','success');}catch{area.select();showNotice('Select the text and copy it manually.');}});
+    card.append(h,area,copy); target.append(card);
+  });
+  showNotice('Draft suggestions created locally. Review accuracy and relevance before use.');
+});
+const researchForm = document.querySelector('#research-form');
+if (researchForm) researchForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const q=document.querySelector('#research-query').value.trim();
+  const target=document.querySelector('#research-results'); target.textContent='Searching public YouTube results…';
+  try {
+    const data=await api('/api/research?q='+encodeURIComponent(q)+'&max_results=10');
+    target.replaceChildren();
+    if (!data.items.length) { target.textContent='No results found.'; return; }
+    data.items.forEach(item=>{
+      const card=document.createElement('div'); card.className='card';
+      const h=document.createElement('strong'); h.textContent=item.title||'Untitled video';
+      const meta=document.createElement('p'); meta.className='muted'; meta.textContent=(item.channelTitle||'Channel')+' · '+(item.viewCount?Number(item.viewCount).toLocaleString()+' public views':'View count unavailable')+' · '+(item.publishedAt?new Date(item.publishedAt).toLocaleDateString():'');
+      const link=document.createElement('a'); link.href='https://www.youtube.com/watch?v='+encodeURIComponent(item.id); link.target='_blank'; link.rel='noopener noreferrer'; link.textContent='Open video ↗'; link.style.color='#bba5ff';
+      card.append(h,meta,link); target.append(card);
+    });
+  } catch(error) { target.textContent=error.message; showNotice(error.message,'error'); }
+});
+const thumbPreviewForm=document.querySelector('#thumbnail-preview-form');
+if(thumbPreviewForm) thumbPreviewForm.addEventListener('change',()=>{
+  const file=document.querySelector('#thumbnail-preview-file').files[0];
+  const image=document.querySelector('#thumbnail-preview'); const meta=document.querySelector('#thumbnail-preview-meta');
+  if(!file) return;
+  if(!['image/jpeg','image/png'].includes(file.type)||file.size>2*1024*1024){image.hidden=true;meta.textContent='Choose a JPEG or PNG image no larger than 2 MB.';return;}
+  const url=URL.createObjectURL(file); image.src=url; image.hidden=false;
+  const probe=new Image(); probe.onload=()=>{meta.textContent=probe.naturalWidth+' × '+probe.naturalHeight+' px · '+(file.size/1024).toFixed(0)+' KB'+(probe.naturalWidth===1280&&probe.naturalHeight===720?' · Recommended dimensions':' · Consider using 1280 × 720');}; probe.src=url;
+});
+
 if (new URLSearchParams(location.search).has('oauth')) {
   const result = new URLSearchParams(location.search).get('oauth');
   showNotice(result === 'connected' ? 'Google authorization callback completed. Checking channel status…' : 'Google authorization was cancelled.', result === 'connected' ? 'success' : 'info');
