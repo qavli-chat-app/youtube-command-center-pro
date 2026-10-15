@@ -47,7 +47,8 @@ def update_video(video_id: str, request: Request, payload: dict[str, Any]):
         existing = yt.videos().list(part="snippet", id=video_id).execute().get("items", [])
         if not existing:
             raise HTTPException(status_code=404, detail="Video not found or not accessible to this channel.")
-        current = existing[0]["snippet"]
+        original = existing[0]["snippet"]
+        current = {key: original[key] for key in ("title", "description", "tags", "categoryId", "defaultLanguage", "defaultAudioLanguage") if key in original}
         current.update(snippet)
         result = yt.videos().update(part="snippet", body={"id": video_id, "snippet": current}).execute()
         audit(sid, "video_metadata_updated", video_id)
@@ -68,7 +69,8 @@ def update_visibility(video_id: str, request: Request, payload: dict[str, Any]):
         result = yt.videos().list(part="status", id=video_id).execute().get("items", [])
         if not result:
             raise HTTPException(status_code=404, detail="Video not found or not accessible.")
-        status = result[0].get("status", {})
+        original = result[0].get("status", {})
+        status = {key: original[key] for key in ("privacyStatus", "license", "embeddable", "publicStatsViewable", "selfDeclaredMadeForKids") if key in original}
         status["privacyStatus"] = visibility
         updated = yt.videos().update(part="status", body={"id": video_id, "status": status}).execute()
         audit(sid, "video_visibility_changed", video_id + ":" + visibility)
