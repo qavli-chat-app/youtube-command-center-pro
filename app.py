@@ -49,12 +49,47 @@ app.add_middleware(
 serializer = URLSafeTimedSerializer(APP_SECRET, salt="ytcc-session-v1") if APP_SECRET else None
 
 
+DATABASE_URL = os.getenv("DATABASE_URL", "").strip()
+
+
+class PostgresConnection:
+    """Small compatibility wrapper so existing parameterized queries work on PostgreSQL."""
+    def __init__(self, connection):
+        self._connection = connection
+
+    def execute(self, query: str, params=()):
+        # App SQL uses SQLite-style '?' placeholders; translate these to psycopg placeholders.
+        return self._connection.execute(query.replace("?", "%s"), params)
+
+    def executescript(self, script: str):
+        for statement in script.split(";"):
+            if statement.strip():
+                self._connection.execute(statement)
+
+    def commit(self):
+        self._connection.commit()
+
+    def rollback(self):
+        self._connection.rollback()
+
+    def close(self):
+        self._connection.close()
+
+
 @contextmanager
-def db() -> Iterator[sqlite3.Connection]:
-    connection = sqlite3.connect(DB_PATH, timeout=15)
-    connection.row_factory = sqlite3.Row
+def db() -> Iterator[Any]:
+    if DATABASE_URL:
+        import psycopg
+        from psycopg.rows import dict_row
+        raw_connection = psycopg.connect(DATABASE_URL, connect_timeout=10, row_factory=dict_row)
+        connection = PostgresConnection(raw_connection)
+    else:
+        # Local development and CI use SQLite; production should set DATABASE_URL.
+        connection = sqlite3.connect(DB_PATH, timeout=15)
+        connection.row_factory = sqlite3.Row
     try:
-        connection.execute("PRAGMA journal_mode=WAL")
+        if not DATABASE_URL:
+            connection.execute("PRAGMA journal_mode=WAL")
         yield connection
         connection.commit()
     except Exception:
@@ -65,8 +100,27 @@ def db() -> Iterator[sqlite3.Connection]:
 
 
 def init_db() -> None:
-    with db() as con:
-        con.executescript("""
+    if DATABASE_URL:
+        schema = """
+        CREATE TABLE IF NOT EXISTS oauth_states (
+          state TEXT PRIMARY KEY, session_id TEXT NOT NULL, created_at BIGINT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS connections (
+          session_id TEXT PRIMARY KEY, encrypted_credentials BYTEA NOT NULL,
+          channel_id TEXT, created_at BIGINT NOT NULL, updated_at BIGINT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS audit_log (
+          id BIGSERIAL PRIMARY KEY, session_id TEXT,
+          action TEXT NOT NULL, detail TEXT NOT NULL, created_at BIGINT NOT NULL
+        );
+        CREATE TABLE IF NOT EXISTS upload_jobs (
+          id TEXT PRIMARY KEY, session_id TEXT NOT NULL, status TEXT NOT NULL,
+          payload TEXT NOT NULL, video_id TEXT, error TEXT, created_at BIGINT NOT NULL,
+          updated_at BIGINT NOT NULL
+        );
+        """
+    else:
+        schema = """
         CREATE TABLE IF NOT EXISTS oauth_states (
           state TEXT PRIMARY KEY, session_id TEXT NOT NULL, created_at INTEGER NOT NULL
         );
@@ -83,7 +137,9 @@ def init_db() -> None:
           payload TEXT NOT NULL, video_id TEXT, error TEXT, created_at INTEGER NOT NULL,
           updated_at INTEGER NOT NULL
         );
-        """)
+        """
+    with db() as con:
+        con.executescript(schema)
 
 
 init_db()
