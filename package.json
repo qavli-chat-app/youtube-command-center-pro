@@ -1,20 +1,10 @@
 {
   "name": "youtube-command-center-pro",
   "private": true,
-  "version": "0.1.0",
-  "type": "module",
+  "version": "0.2.0",
+  "description": "YouTube-only channel management dashboard and API",
   "scripts": {
-    "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
-    "preview": "vite preview --host 0.0.0.0"
-  },
-  "dependencies": {
-    "lucide-react": "^0.468.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1"
-  },
-  "devDependencies": {
-    "@vitejs/plugin-react": "^4.3.4",
-    "vite": "^6.0.7"
+    "build": "python -m compileall -q app.py api_extensions.py",
+    "start": "uvicorn app:app --host 0.0.0.0 --port 8000"
   }
 }
