@@ -1,0 +1,44 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "android-wrapper/**"
+      - ".github/workflows/android-apk.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+      - name: Build installable debug APK
+        working-directory: android-wrapper
+        run: gradle assembleDebug
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: YouTube-Command-Center-PRO-Android-APK
+          path: android-wrapper/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
+      - name: Publish APK as GitHub release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: android-v1.0.${{ github.run_number }}
+          name: YouTube Command Center PRO Android v1.0.${{ github.run_number }}
+          generate_release_notes: true
+          files: android-wrapper/app/build/outputs/apk/debug/app-debug.apk
