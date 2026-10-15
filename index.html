@@ -21,6 +21,7 @@
     <button data-page="SEO Studio"><span class="nav-icon">⌕</span>SEO Studio</button>
     <button data-page="Thumbnail Studio"><span class="nav-icon">▧</span>Thumbnail Studio</button>
     <button data-page="Topic Research"><span class="nav-icon">✧</span>Topic Research</button>
+    <button data-page="Content Planner"><span class="nav-icon">▦</span>Content Planner</button>
     <button data-page="Comments & Moderation"><span class="nav-icon">☷</span>Comments &amp; Moderation</button>
     <button data-page="Channel Settings"><span class="nav-icon">☷</span>Channel Settings</button>
     <button data-page="Automation Rules"><span class="nav-icon">⚙</span>Automation Rules</button>
@@ -55,6 +56,29 @@
   <section class="panel-page" id="panel-seo-studio" hidden><article class="card"><div class="empty"><strong>Complete SEO Studio</strong>Generate title options, a description, hashtags, tags, a hook, a video outline, thumbnail concept, and pinned comment. Drafts are local templates; verify them before publishing.</div><form id="seo-form" class="form-grid"><label class="field full">Video topic<input class="text-input" id="seo-topic" required maxlength="120" placeholder="e.g. Class 9 mathematics algebra"></label><label class="field full">Audience / language<input class="text-input" id="seo-audience" placeholder="e.g. Pakistan students, Urdu + English"></label><div class="full"><button class="btn primary" type="submit">Generate draft ideas</button></div></form><div id="seo-results" class="list" style="margin-top:16px"></div></article></section>
   <section class="panel-page" id="panel-thumbnail-studio" hidden><article class="card"><div class="empty"><strong>Thumbnail Studio</strong>Preview an image and check its dimensions before applying it to a video from My Videos.</div><form id="thumbnail-preview-form" class="form-grid"><label class="field full">Choose thumbnail/photo from your phone Gallery<input class="text-input" type="file" id="thumbnail-preview-file" accept="image/jpeg,image/png" required></label><label class="field full">YouTube video ID<input class="text-input" type="text" id="thumbnail-video-id" maxlength="80" placeholder="Paste the video ID from My Videos"></label><div id="thumbnail-preview-meta" class="muted full">Recommended canvas: 1280 × 720. JPEG or PNG, 2 MB max for this uploader.</div><div class="full"><img id="thumbnail-preview" alt="Thumbnail preview" hidden style="width:100%;max-width:640px;border-radius:12px;border:1px solid #36364b"></div><div class="full"><button class="btn primary" type="submit">Apply thumbnail to YouTube video</button></div></form><p class="muted">You can also choose Thumbnail on any item in My Videos. YouTube accepts eligible JPEG/PNG images; 1280 × 720 is recommended.</p></article></section>
   <section class="panel-page" id="panel-topic-research" hidden><article class="card"><div class="empty"><strong>Deep Topic & Trend Research</strong>Compare recent uploads with high-view public YouTube results, estimate views per day, and rank this search set using a relative engagement/velocity score. These are public signals, not private analytics or a promise of virality.</div><form id="research-form" class="form-grid"><label class="field full">Topic or keyword<input class="text-input" id="research-query" required maxlength="100" placeholder="Search YouTube topics"></label><div class="full"><button class="btn primary" type="submit">Research YouTube</button></div></form><div id="research-results" class="list" style="margin-top:16px"></div></article></section>
+  <section class="panel-page" id="panel-content-planner" hidden>
+    <article class="card">
+      <div class="empty"><strong>Content Planner & Script Lab</strong>Create a repeatable weekly/ monthly plan, short-form hooks, long-form outlines and draft scripts. This free local generator uses templates; validate facts and audience fit before publishing.</div>
+      <form id="planner-form" class="form-grid">
+        <label class="field full">Channel niche / topic<input class="text-input" id="planner-niche" maxlength="120" required placeholder="e.g. Class 9 maths in Urdu"></label>
+        <label class="field">Audience<input class="text-input" id="planner-audience" maxlength="100" placeholder="e.g. Pakistan students"></label>
+        <label class="field">Publishing pace<select class="text-input" id="planner-frequency"><option value="7">7-day plan</option><option value="14">14-day plan</option><option value="30">30-day plan</option></select></label>
+        <label class="field">Content style<select class="text-input" id="planner-format"><option value="mixed">Mixed: Shorts + long videos</option><option value="shorts">YouTube Shorts</option><option value="long">Long-form videos</option></select></label>
+        <div class="full"><button class="btn primary" type="submit">Build content plan</button> <button class="btn" id="planner-copy" type="button" disabled>Copy plan</button> <button class="btn" id="planner-csv" type="button" disabled>Export CSV</button></div>
+      </form>
+      <div id="planner-results" class="list" style="margin-top:16px"></div>
+    </article>
+    <article class="card">
+      <div class="section-title" style="margin-top:0"><h2>Script starter</h2><span class="pill">Draft, not fact-checked</span></div>
+      <form id="script-form" class="form-grid">
+        <label class="field full">Exact video topic<input class="text-input" id="script-topic" maxlength="160" required placeholder="What will this video teach or explain?"></label>
+        <label class="field">Video type<select class="text-input" id="script-type"><option value="short">Short (about 45–60 sec)</option><option value="long">Long video (about 4–6 min outline)</option></select></label>
+        <label class="field">Language / tone<input class="text-input" id="script-tone" maxlength="80" placeholder="e.g. simple Urdu-English"></label>
+        <div class="full"><button class="btn primary" type="submit">Generate script draft</button></div>
+      </form>
+      <div id="script-results" class="list" style="margin-top:16px"></div>
+    </article>
+  </section>
   <section class="panel-page" id="panel-comments-&-moderation" hidden><article class="card"><div class="empty"><strong>Comments &amp; Moderation</strong>Comment API endpoints are available after connection. Load a video’s comments using its YouTube video ID.</div><form id="comments-form" class="form-grid"><label class="field full">Video ID<input class="text-input" id="comments-video-id" required placeholder="YouTube video ID"></label><div class="full"><button class="btn primary" type="submit">Load comments</button></div></form><div id="comments-results" class="list" style="margin-top:16px"></div></article></section>
   <section class="panel-page" id="panel-channel-settings" hidden><article class="card"><div class="empty"><strong>Channel Settings</strong>Read-only channel details are available through the API. Many account-level settings must be changed directly in YouTube Studio.</div><div id="channel-settings-data" class="list"></div><p><a href="https://studio.youtube.com/" target="_blank" rel="noopener noreferrer" style="color:#bba5ff">Open YouTube Studio ↗</a></p></article></section>
   <section class="panel-page" id="panel-notifications" hidden><article class="card"><div class="empty"><strong>Notifications</strong>Recent upload outcomes and failed jobs</div><div class="notification-list list"></div></article></section>
