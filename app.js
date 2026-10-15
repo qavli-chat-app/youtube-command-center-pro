@@ -407,18 +407,34 @@ const researchForm = document.querySelector('#research-form');
 if (researchForm) researchForm.addEventListener('submit', async event => {
   event.preventDefault();
   const q=document.querySelector('#research-query').value.trim();
-  const target=document.querySelector('#research-results'); target.textContent='Searching public YouTube results…';
+  const target=document.querySelector('#research-results'); target.textContent='Comparing recent uploads and high-view videos on YouTube…';
   try {
-    const data=await api('/api/research?q='+encodeURIComponent(q)+'&max_results=10');
+    const data=await api('/api/research?q='+encodeURIComponent(q)+'&max_results=12');
     target.replaceChildren();
-    if (!data.items.length) { target.textContent='No results found.'; return; }
-    data.items.forEach(item=>{
+    const summary=document.createElement('div'); summary.className='card';
+    const summaryTitle=document.createElement('strong'); summaryTitle.textContent='Trend research summary';
+    const summaryText=document.createElement('p'); summaryText.className='muted';
+    summaryText.textContent=(data.method||'Compared public YouTube results.')+' '+(data.note||'');
+    summary.append(summaryTitle,summaryText); target.append(summary);
+    if (!data.items.length) { const empty=document.createElement('p'); empty.textContent='No results found. Try a broader keyword.'; target.append(empty); return; }
+    const top=data.items[0];
+    const idea=document.createElement('div'); idea.className='card';
+    const ideaTitle=document.createElement('strong'); ideaTitle.textContent='Suggested original video angle';
+    const ideaText=document.createElement('p'); ideaText.textContent='Study the audience interest behind “'+(top.title||q)+'”, but make a fresh explanation, comparison, challenge, or practical tutorial instead of copying the video.';
+    const hook=document.createElement('p'); hook.textContent='Hook idea: “Most people miss this important part of '+q+' — here is a simple way to understand it.”';
+    const useIdea=document.createElement('button'); useIdea.className='btn primary'; useIdea.textContent='Use topic in SEO Studio';
+    useIdea.addEventListener('click',()=>{document.querySelector('#seo-topic').value=q;document.querySelector('#seo-audience').value='Viewers interested in '+q;document.querySelector('[data-page="SEO Studio"]').click();document.querySelector('#seo-form').requestSubmit();});
+    idea.append(ideaTitle,ideaText,hook,useIdea); target.append(idea);
+    data.items.forEach((item,index)=>{
       const card=document.createElement('div'); card.className='card';
-      const h=document.createElement('strong'); h.textContent=item.title||'Untitled video';
-      const meta=document.createElement('p'); meta.className='muted'; meta.textContent=(item.channelTitle||'Channel')+' · '+(item.viewCount?Number(item.viewCount).toLocaleString()+' public views':'View count unavailable')+' · '+(item.publishedAt?new Date(item.publishedAt).toLocaleDateString():'');
+      if(item.thumbnail){const img=document.createElement('img');img.src=item.thumbnail;img.alt='';img.loading='lazy';img.style.cssText='width:100%;max-width:360px;border-radius:10px;object-fit:cover';card.append(img);}
+      const h=document.createElement('strong'); h.textContent=(index+1)+'. '+(item.title||'Untitled video');
+      const meta=document.createElement('p'); meta.className='muted';
+      meta.textContent=(item.channelTitle||'Channel')+' · '+Number(item.viewCount||0).toLocaleString()+' views · '+Number(item.viewsPerDay||0).toLocaleString()+' estimated views/day · '+Number(item.engagementRate||0).toFixed(2)+'% visible engagement · relative score '+item.trendScore+' · '+(item.publishedAt?new Date(item.publishedAt).toLocaleDateString():'date unavailable');
       const link=document.createElement('a'); link.href='https://www.youtube.com/watch?v='+encodeURIComponent(item.id); link.target='_blank'; link.rel='noopener noreferrer'; link.textContent='Open video ↗'; link.style.color='#bba5ff';
       card.append(h,meta,link); target.append(card);
     });
+    showNotice('Trend research complete. Scores compare these search results only; they do not predict virality.','success');
   } catch(error) { target.textContent=error.message; showNotice(error.message,'error'); }
 });
 const videoGalleryInput=document.querySelector('#video-gallery-file');
