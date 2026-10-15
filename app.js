@@ -248,6 +248,28 @@ if (commentsForm) commentsForm.addEventListener('submit', async event => {
   } catch (error) { target.textContent = error.message; showNotice(error.message, 'error'); }
 });
 
+
+function uploadWithProgress(formData, onProgress) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', '/api/videos/upload');
+    xhr.withCredentials = true;
+    xhr.upload.onprogress = event => { if (event.lengthComputable) onProgress(Math.min(99, Math.round(event.loaded / event.total * 100))); };
+    xhr.onload = () => {
+      let data = {};
+      try { data = JSON.parse(xhr.responseText); } catch {}
+      if (xhr.status >= 200 && xhr.status < 300) resolve(data);
+      else {
+        const detail = typeof data.detail === 'string' ? data.detail : data.detail?.message || data.detail?.code || 'Upload request failed.';
+        reject(new Error(detail));
+      }
+    };
+    xhr.onerror = () => reject(new Error('Network interruption during upload. Check YouTube Studio before retrying to avoid duplicates.'));
+    xhr.onabort = () => reject(new Error('Upload was cancelled. Check YouTube Studio before retrying.'));
+    xhr.send(formData);
+  });
+}
+
 const uploadForm = document.querySelector('#upload-form');
 if (uploadForm) uploadForm.addEventListener('submit', async event => {
   event.preventDefault();
@@ -269,7 +291,7 @@ if (uploadForm) uploadForm.addEventListener('submit', async event => {
   button.disabled = true; button.textContent = 'Uploading…';
   showNotice('Upload started. Keep this page open while the server sends the file to YouTube.');
   try {
-    const result = await api('/api/videos/upload', { method: 'POST', body });
+    const result = await uploadWithProgress(body, percent => showNotice('Uploading video to YouTube… ' + percent + '%'));
     showNotice('YouTube confirmed upload. Video ID: ' + result.videoId + '. ' + (result.scheduledPublishAt ? 'Scheduled for ' + new Date(result.scheduledPublishAt).toLocaleString() + '.' : 'It is private.'), 'success');
     uploadForm.reset();
   } catch (error) {
@@ -344,9 +366,9 @@ if (seoForm) seoForm.addEventListener('submit', event => {
     'Learn ' + topic + ' Step by Step',
     topic + ' Explained with Examples'
   ];
-  const description = topic + '\\n\\nIn this lesson, we cover:\\n• Key concepts and explanations\\n• Step-by-step examples\\n• Practice and revision points\\n\\n' + (audience ? 'Made for: ' + audience + '\\n\\n' : '') + 'Subscribe for more educational videos. Check the lesson and all details before publishing.';
+  const description = topic + '\n\nIn this lesson, we cover:\n• Key concepts and explanations\n• Step-by-step examples\n• Practice and revision points\n\n' + (audience ? 'Made for: ' + audience + '\n\n' : '') + 'Subscribe for more educational videos. Check the lesson and all details before publishing.';
   const tags = [...new Set(topic.toLowerCase().split(/[^a-z0-9]+/).filter(Boolean).concat(['tutorial','explained','learning']))].slice(0,15).join(', ');
-  [['Title ideas', titles.join('\\n')],['Description draft',description],['Tag ideas',tags]].forEach(([label,value]) => {
+  [['Title ideas', titles.join('\n')],['Description draft',description],['Tag ideas',tags]].forEach(([label,value]) => {
     const card=document.createElement('div'); card.className='card';
     const h=document.createElement('strong'); h.textContent=label;
     const area=document.createElement('textarea'); area.className='text-input'; area.rows=label==='Description draft'?7:4; area.value=value;
