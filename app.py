@@ -4,7 +4,7 @@ import os
 import secrets
 import sqlite3
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timezone, date
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlencode
@@ -337,6 +337,15 @@ def videos(request: Request, query: str = "", page_token: str | None = None, max
 @app.get("/api/analytics")
 def analytics(request: Request, start_date: str, end_date: str):
     sid = require_session(request)
+    try:
+        start = date.fromisoformat(start_date)
+        end = date.fromisoformat(end_date)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="Dates must use YYYY-MM-DD format.")
+    if start > end or (end - start).days > 365:
+        raise HTTPException(status_code=400, detail="Choose a valid date range of no more than 366 calendar days.")
+    if end > datetime.now(timezone.utc).date():
+        raise HTTPException(status_code=400, detail="End date cannot be in the future.")
     creds = load_credentials(sid)
     try:
         analytics_api = build("youtubeAnalytics", "v2", credentials=creds, cache_discovery=False)
