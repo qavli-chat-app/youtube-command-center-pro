@@ -294,3 +294,33 @@ def notifications(request: Request):
                       "message": job["error"] or ("Upload confirmed by YouTube." if job["status"] == "completed" else "Upload failed."),
                       "createdAt": job["updated_at"]})
     return {"items": items}
+
+
+@app.get("/api/research")
+def topic_research(request: Request, q: str, max_results: int = 10):
+    sid = require_session(request)
+    query = q.strip()
+    if len(query) < 2 or len(query) > 100:
+        raise HTTPException(status_code=400, detail="Research query must be between 2 and 100 characters.")
+    max_results = min(max(1, max_results), 25)
+    yt = youtube_api(sid)
+    try:
+        data = yt.search().list(part="snippet", q=query, type="video", maxResults=max_results,
+                                order="relevance", safeSearch="moderate").execute()
+        ids = [item.get("id", {}).get("videoId") for item in data.get("items", []) if item.get("id", {}).get("videoId")]
+        stats = yt.videos().list(part="statistics", id=",".join(ids)).execute() if ids else {"items": []}
+        stat_map = {item["id"]: item.get("statistics", {}) for item in stats.get("items", [])}
+        rows = []
+        for item in data.get("items", []):
+            video_id = item.get("id", {}).get("videoId")
+            if not video_id:
+                continue
+            snippet = item.get("snippet", {})
+            rows.append({"id": video_id, "title": snippet.get("title"), "description": snippet.get("description"),
+                         "channelTitle": snippet.get("channelTitle"), "publishedAt": snippet.get("publishedAt"),
+                         "thumbnail": snippet.get("thumbnails", {}).get("medium", {}).get("url"),
+                         "viewCount": stat_map.get(video_id, {}).get("viewCount")})
+        audit(sid, "topic_research", query)
+        return {"query": query, "items": rows, "note": "Search results and public counts are snapshots, not private competitor analytics or predictions."}
+    except HttpError as exc:
+        raise HTTPException(status_code=502, detail={"code": "RESEARCH_API_ERROR", "message": "YouTube search failed. Check API quota and permissions.", "status": exc.resp.status})
