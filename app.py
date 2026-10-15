@@ -1,12 +1,13 @@
 import base64
 import json
+from contextlib import contextmanager
 import os
 import secrets
 import sqlite3
 import time
 from datetime import datetime, timezone, date
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
 from urllib.parse import urlencode
 from urllib.request import Request as UrlRequest, urlopen
 
@@ -48,11 +49,19 @@ app.add_middleware(
 serializer = URLSafeTimedSerializer(APP_SECRET, salt="ytcc-session-v1") if APP_SECRET else None
 
 
-def db() -> sqlite3.Connection:
+@contextmanager
+def db() -> Iterator[sqlite3.Connection]:
     connection = sqlite3.connect(DB_PATH, timeout=15)
     connection.row_factory = sqlite3.Row
-    connection.execute("PRAGMA journal_mode=WAL")
-    return connection
+    try:
+        connection.execute("PRAGMA journal_mode=WAL")
+        yield connection
+        connection.commit()
+    except Exception:
+        connection.rollback()
+        raise
+    finally:
+        connection.close()
 
 
 def init_db() -> None:
@@ -182,6 +191,16 @@ def youtube_api(sid: str):
         raise
     except Exception:
         raise HTTPException(status_code=502, detail={"code": "YOUTUBE_API_ERROR", "message": "YouTube API client could not be initialized."})
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return response
 
 
 @app.get("/health")
