@@ -403,15 +403,58 @@ if (researchForm) researchForm.addEventListener('submit', async event => {
     });
   } catch(error) { target.textContent=error.message; showNotice(error.message,'error'); }
 });
-const thumbPreviewForm=document.querySelector('#thumbnail-preview-form');
-if(thumbPreviewForm) thumbPreviewForm.addEventListener('change',()=>{
-  const file=document.querySelector('#thumbnail-preview-file').files[0];
-  const image=document.querySelector('#thumbnail-preview'); const meta=document.querySelector('#thumbnail-preview-meta');
+const videoGalleryInput=document.querySelector('#video-gallery-file');
+if(videoGalleryInput) videoGalleryInput.addEventListener('change',()=>{
+  const file=videoGalleryInput.files[0];
+  const preview=document.querySelector('#video-gallery-preview');
+  const meta=document.querySelector('#video-gallery-meta');
   if(!file) return;
-  if(!['image/jpeg','image/png'].includes(file.type)||file.size>2*1024*1024){image.hidden=true;meta.textContent='Choose a JPEG or PNG image no larger than 2 MB.';return;}
-  const url=URL.createObjectURL(file); image.src=url; image.hidden=false;
-  const probe=new Image(); probe.onload=()=>{meta.textContent=probe.naturalWidth+' × '+probe.naturalHeight+' px · '+(file.size/1024).toFixed(0)+' KB'+(probe.naturalWidth===1280&&probe.naturalHeight===720?' · Recommended dimensions':' · Consider using 1280 × 720');}; probe.src=url;
+  if(!file.type.startsWith('video/')) { preview.hidden=true; meta.textContent='Please choose a video file from Gallery or Files.'; return; }
+  const oldUrl=preview.dataset.objectUrl;
+  if(oldUrl) URL.revokeObjectURL(oldUrl);
+  const url=URL.createObjectURL(file);
+  preview.dataset.objectUrl=url; preview.src=url; preview.hidden=false;
+  meta.textContent=file.name+' · '+(file.size/1024/1024).toFixed(1)+' MB · Ready to upload privately';
 });
+
+const thumbPreviewForm=document.querySelector('#thumbnail-preview-form');
+if(thumbPreviewForm) {
+  thumbPreviewForm.addEventListener('change',()=>{
+    const file=document.querySelector('#thumbnail-preview-file').files[0];
+    const image=document.querySelector('#thumbnail-preview'); const meta=document.querySelector('#thumbnail-preview-meta');
+    if(!file) return;
+    if(!['image/jpeg','image/png'].includes(file.type)||file.size>2*1024*1024){image.hidden=true;meta.textContent='Choose a JPEG or PNG image no larger than 2 MB.';return;}
+    const oldUrl=image.dataset.objectUrl;
+    if(oldUrl) URL.revokeObjectURL(oldUrl);
+    const url=URL.createObjectURL(file); image.dataset.objectUrl=url; image.src=url; image.hidden=false;
+    const probe=new Image(); probe.onload=()=>{meta.textContent=probe.naturalWidth+' × '+probe.naturalHeight+' px · '+(file.size/1024).toFixed(0)+' KB'+(probe.naturalWidth===1280&&probe.naturalHeight===720?' · Recommended dimensions':' · Consider using 1280 × 720');}; probe.src=url;
+  });
+  thumbPreviewForm.addEventListener('submit',async event=>{
+    event.preventDefault();
+    const file=document.querySelector('#thumbnail-preview-file').files[0];
+    const videoId=document.querySelector('#thumbnail-video-id').value.trim();
+    const meta=document.querySelector('#thumbnail-preview-meta');
+    if(!file){showNotice('Choose a thumbnail photo from Gallery first.','error');return;}
+    if(!videoId){showNotice('Enter a video ID. Open My Videos and copy the video ID for the video you want to update.','error');return;}
+    if(!['image/jpeg','image/png'].includes(file.type)||file.size>2*1024*1024){showNotice('Choose a JPEG or PNG image no larger than 2 MB.','error');return;}
+    const probe=await new Promise(resolve=>{
+      const img=new Image(); img.onload=()=>resolve({width:img.naturalWidth,height:img.naturalHeight}); img.onerror=()=>resolve(null);
+      img.src=URL.createObjectURL(file);
+    });
+    if(!probe){showNotice('The selected photo could not be read. Choose another image.','error');return;}
+    if(probe.width<640||probe.height<360){showNotice('Thumbnail must be at least 640 × 360 pixels. 1280 × 720 is recommended.','error');return;}
+    if(!confirm('Apply this selected thumbnail to YouTube video '+videoId+'?')) return;
+    const button=thumbPreviewForm.querySelector('button[type="submit"]');
+    button.disabled=true; button.textContent='Applying thumbnail…';
+    try{
+      const body=new FormData(); body.append('file',file);
+      await api('/api/videos/'+encodeURIComponent(videoId)+'/thumbnail',{method:'POST',body});
+      showNotice('YouTube confirmed the thumbnail update.','success');
+      meta.textContent=probe.width+' × '+probe.height+' px · Applied successfully';
+    }catch(error){showNotice(error.message,'error');}
+    finally{button.disabled=false;button.textContent='Apply thumbnail to YouTube video';}
+  });
+}
 
 if (new URLSearchParams(location.search).has('oauth')) {
   const result = new URLSearchParams(location.search).get('oauth');
