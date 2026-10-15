@@ -38,6 +38,8 @@ navItems.forEach(item => item.addEventListener('click', () => {
   if (item.dataset.page === 'My Videos') loadVideos();
   if (item.dataset.page === 'Security & API') loadConnectionStatus();
   if (item.dataset.page === 'Notifications') loadNotifications();
+  if (item.dataset.page === 'Channel Settings') loadChannelSettings();
+  if (item.dataset.page === 'Security & API') renderSecurityStatus();
 }));
 
 async function loadConnectionStatus() {
@@ -144,6 +146,67 @@ async function loadVideos(query = '') {
     showNotice(error.message, 'error');
   }
 }
+const videoSearch = document.querySelector('#video-search');
+if (videoSearch) {
+  let searchTimer;
+  videoSearch.addEventListener('input', () => {
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => loadVideos(videoSearch.value), 350);
+  });
+}
+const videosRefresh = document.querySelector('#videos-refresh');
+if (videosRefresh) videosRefresh.addEventListener('click', () => loadVideos(videoSearch?.value || ''));
+
+async function loadChannelSettings() {
+  const target = document.querySelector('#channel-settings-data');
+  if (!target) return;
+  target.textContent = 'Loading channel settings…';
+  try {
+    const data = await api('/api/channel/settings');
+    target.replaceChildren();
+    [['Channel', data.title], ['Channel ID', data.id], ['Country', data.country], ['Language', data.defaultLanguage], ['Custom URL', data.customUrl]].forEach(([label, value]) => {
+      if (!value) return;
+      const row = document.createElement('div'); row.className = 'task';
+      const text = document.createElement('div'); text.textContent = label + ': ' + value;
+      row.append(text); target.append(row);
+    });
+  } catch (error) { target.textContent = error.message; }
+}
+function renderSecurityStatus() {
+  const target = document.querySelector('#security-status');
+  if (!target) return;
+  target.replaceChildren();
+  [['OAuth status', connectButton.dataset.connected === 'yes' ? 'Connected' : 'Not connected'], ['API mode', 'Official YouTube Data API v3'], ['Token storage', 'Encrypted server-side'], ['Production deployment', 'Not yet independently verified']].forEach(([label, value]) => {
+    const row = document.createElement('div'); row.className = 'task';
+    const text = document.createElement('div'); text.textContent = label + ': ' + value;
+    row.append(text); target.append(row);
+  });
+}
+const commentsForm = document.querySelector('#comments-form');
+if (commentsForm) commentsForm.addEventListener('submit', async event => {
+  event.preventDefault();
+  const target = document.querySelector('#comments-results');
+  target.textContent = 'Loading comments…';
+  try {
+    const data = await api('/api/comments?video_id=' + encodeURIComponent(document.querySelector('#comments-video-id').value.trim()));
+    target.replaceChildren();
+    if (!data.items.length) { target.textContent = 'No comments returned, or comments are disabled for this video.'; return; }
+    data.items.forEach(comment => {
+      const card = document.createElement('div'); card.className = 'card';
+      const author = document.createElement('strong'); author.textContent = comment.author || 'YouTube user';
+      const text = document.createElement('p'); text.textContent = comment.text || '';
+      const reply = document.createElement('textarea'); reply.className = 'text-input'; reply.rows = 2; reply.placeholder = 'Write a reply…';
+      const button = document.createElement('button'); button.className = 'btn'; button.textContent = 'Reply';
+      button.addEventListener('click', async () => {
+        if (!confirm('Send this reply to YouTube?')) return;
+        try { await api('/api/comments/' + encodeURIComponent(comment.id) + '/reply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text:reply.value})}); showNotice('YouTube confirmed the comment reply.', 'success'); button.disabled=true; }
+        catch (error) { showNotice(error.message, 'error'); }
+      });
+      card.append(author, text, reply, button); target.append(card);
+    });
+  } catch (error) { target.textContent = error.message; showNotice(error.message, 'error'); }
+});
+
 const uploadForm = document.querySelector('#upload-form');
 if (uploadForm) uploadForm.addEventListener('submit', async event => {
   event.preventDefault();
