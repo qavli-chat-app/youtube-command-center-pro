@@ -12,6 +12,8 @@ import time
 import uuid
 from pathlib import Path
 from datetime import datetime, timezone
+from io import BytesIO
+from PIL import Image, UnidentifiedImageError
 from fastapi import File, Form, UploadFile
 from googleapiclient.http import MediaFileUpload
 
@@ -191,6 +193,15 @@ async def upload_thumbnail(video_id: str, request: Request, file: UploadFile = F
         raise HTTPException(status_code=413, detail="Thumbnail exceeds 2 MB.")
     if not content:
         raise HTTPException(status_code=400, detail="Thumbnail file is empty.")
+    try:
+        with Image.open(BytesIO(content)) as image:
+            if image.format not in {"JPEG", "PNG"}:
+                raise HTTPException(status_code=400, detail="Thumbnail content must be a valid JPEG or PNG image.")
+            width, height = image.size
+            if width < 640 or height < 360:
+                raise HTTPException(status_code=400, detail="Thumbnail must be at least 640 × 360 pixels. 1280 × 720 is recommended.")
+    except UnidentifiedImageError:
+        raise HTTPException(status_code=400, detail="The uploaded file is not a valid image.")
     suffix = ".jpg" if file.content_type == "image/jpeg" else ".png"
     temp_path = None
     try:
@@ -200,7 +211,8 @@ async def upload_thumbnail(video_id: str, request: Request, file: UploadFile = F
         yt = youtube_api(sid)
         result = yt.thumbnails().set(videoId=video_id, media_body=MediaFileUpload(temp_path, mimetype=file.content_type)).execute()
         audit(sid, "thumbnail_updated", video_id)
-        return {"success": True, "videoId": video_id, "thumbnail": result.get("items", [{}])[0].get("url")}
+        return {"success": True, "videoId": video_id, "width": width, "height": height,
+                "thumbnail": result.get("items", [{}])[0].get("url")}
     except HttpError as exc:
         raise HTTPException(status_code=502, detail={"code": "THUMBNAIL_FAILED", "message": "Thumbnail update failed. Check channel permissions, image dimensions, and API quota.", "status": exc.resp.status})
     finally:
