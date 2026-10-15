@@ -371,3 +371,7 @@ def css():
 @app.get("/app.js")
 def javascript():
     return FileResponse(ROOT / "app.js", media_type="application/javascript")
+
+
+# Register the additional YouTube video and comments routes.
+import api_extensions  # noqa: E402,F401
