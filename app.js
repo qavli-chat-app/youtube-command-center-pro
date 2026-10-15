@@ -437,6 +437,106 @@ if (researchForm) researchForm.addEventListener('submit', async event => {
     showNotice('Trend research complete. Scores compare these search results only; they do not predict virality.','success');
   } catch(error) { target.textContent=error.message; showNotice(error.message,'error'); }
 });
+
+const plannerForm = document.querySelector('#planner-form');
+let latestPlan = [];
+const plannerTopics = [
+  ['Beginner foundation', 'explain the basic idea in simple steps'],
+  ['Common mistakes', 'show three mistakes and how to correct them'],
+  ['Worked example', 'solve one realistic example from start to finish'],
+  ['Myth vs fact', 'separate a common misconception from the facts'],
+  ['Quick revision', 'summarize the most important points'],
+  ['Challenge', 'give viewers a short question to try before revealing the answer'],
+  ['Comparison', 'compare two methods and explain when each is useful'],
+  ['FAQ', 'answer the questions beginners ask most often'],
+  ['Step-by-step tutorial', 'demonstrate a repeatable process'],
+  ['Practice set', 'give three practice prompts with a clear solution'],
+  ['Real-life use', 'connect the topic to a practical everyday example'],
+  ['Recap', 'recap key takeaways and preview the next lesson']
+];
+const plannerHooks = [
+  'Most beginners miss this part of {topic}—let’s make it simple.',
+  'Can you solve this {topic} challenge before the answer appears?',
+  'In under a minute, understand one useful idea about {topic}.',
+  'Stop and check this common misunderstanding about {topic}.',
+  'Here is a step-by-step way to approach {topic}.'
+];
+function safeText(value) { return String(value || '').trim(); }
+function buildPlannerPlan(niche, audience, days, format) {
+  const result = [];
+  for (let i=0;i<days;i++) {
+    const [angle, brief] = plannerTopics[i % plannerTopics.length];
+    const type = format === 'shorts' ? 'Short' : format === 'long' ? 'Long video' : (i % 3 === 0 ? 'Long video' : 'Short');
+    const topic = niche + ': ' + angle;
+    const title = type === 'Short'
+      ? niche + ' in 60 Seconds: ' + angle
+      : niche + ' ' + angle + ' | Step-by-Step Guide';
+    const hook = plannerHooks[i % plannerHooks.length].replaceAll('{topic}', niche.toLowerCase());
+    const cta = i % 2 ? 'Ask viewers to comment with their question or attempt.' : 'Invite viewers to save the lesson and watch the next related video.';
+    result.push({day:i+1,format:type,topic,title,hook,brief:brief[0].toUpperCase()+brief.slice(1)+'.',audience:audience || 'Your target viewers',cta});
+  }
+  return result;
+}
+function renderPlannerPlan(plan) {
+  const target=document.querySelector('#planner-results'); target.replaceChildren();
+  plan.forEach(item=>{
+    const card=document.createElement('div'); card.className='card';
+    const heading=document.createElement('strong'); heading.textContent='Day '+item.day+' · '+item.format;
+    const title=document.createElement('p'); title.textContent='Title: '+item.title;
+    const hook=document.createElement('p'); hook.textContent='Hook: '+item.hook;
+    const brief=document.createElement('p'); brief.textContent='Core idea: '+item.brief;
+    const cta=document.createElement('p'); cta.textContent='CTA: '+item.cta;
+    card.append(heading,title,hook,brief,cta); target.append(card);
+  });
+}
+if (plannerForm) {
+  try {
+    const saved=JSON.parse(localStorage.getItem('ytcc_content_plan') || '[]');
+    if(Array.isArray(saved) && saved.length){latestPlan=saved;renderPlannerPlan(saved);document.querySelector('#planner-copy').disabled=false;document.querySelector('#planner-csv').disabled=false;}
+  } catch {}
+  plannerForm.addEventListener('submit',event=>{
+    event.preventDefault();
+    const niche=safeText(document.querySelector('#planner-niche').value);
+    const audience=safeText(document.querySelector('#planner-audience').value);
+    const days=Number(document.querySelector('#planner-frequency').value);
+    const format=document.querySelector('#planner-format').value;
+    if(!niche){showNotice('Enter your channel niche or topic first.','error');return;}
+    latestPlan=buildPlannerPlan(niche,audience,days,format);
+    renderPlannerPlan(latestPlan);
+    try{localStorage.setItem('ytcc_content_plan',JSON.stringify(latestPlan));}catch{}
+    document.querySelector('#planner-copy').disabled=false;document.querySelector('#planner-csv').disabled=false;
+    showNotice(days+'-day content plan created and saved on this device. These are planning drafts, not live trend guarantees.','success');
+  });
+  document.querySelector('#planner-copy').addEventListener('click',async()=>{
+    const text=latestPlan.map(p=>['Day '+p.day+' — '+p.format,p.title,'Hook: '+p.hook,'Core idea: '+p.brief,'CTA: '+p.cta].join('\n')).join('\n\n');
+    try{await navigator.clipboard.writeText(text);showNotice('Content plan copied.','success');}catch{showNotice('Clipboard unavailable; select and copy the plan text.','error');}
+  });
+  document.querySelector('#planner-csv').addEventListener('click',()=>{
+    const esc=v=>'"'+String(v).replaceAll('"','""')+'"';
+    const csv=[['Day','Format','Topic','Title','Hook','Core idea','Audience','CTA'],...latestPlan.map(p=>[p.day,p.format,p.topic,p.title,p.hook,p.brief,p.audience,p.cta])].map(row=>row.map(esc).join(',')).join('\r\n');
+    const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));
+    const a=document.createElement('a');a.href=url;a.download='youtube-content-plan.csv';a.click();URL.revokeObjectURL(url);
+    showNotice('CSV export prepared.','success');
+  });
+}
+const scriptForm=document.querySelector('#script-form');
+if(scriptForm) scriptForm.addEventListener('submit',event=>{
+  event.preventDefault();
+  const topic=safeText(document.querySelector('#script-topic').value);
+  const tone=safeText(document.querySelector('#script-tone').value)||'clear, friendly language';
+  const type=document.querySelector('#script-type').value;
+  const content=type==='short'
+    ? 'SHORT VIDEO SCRIPT DRAFT — '+topic+'\n\n[0–3 sec | HOOK]\n'+topic+' can be easier than it looks. Here is the key idea.\n\n[3–12 sec | CONTEXT]\nToday we will explain '+topic+' in '+tone+'.\n\n[12–40 sec | MAIN VALUE]\nStep 1: Explain the basic concept in one simple sentence.\nStep 2: Demonstrate one accurate example on screen.\nStep 3: Point out one common mistake and show the correction.\n\n[40–55 sec | RECAP]\nRemember: explain the main rule, show the example, and check the result.\n\n[55–60 sec | CTA]\nWhat part should be explained next? Leave a specific question in the comments.\n\nEDITOR NOTE: Replace generic steps with verified facts/examples before recording.'
+    : 'LONG VIDEO SCRIPT OUTLINE — '+topic+'\n\n[0:00–0:20 | OPENING HOOK]\nShow the problem/result first. Promise a specific, realistic learning outcome for '+topic+'.\n\n[0:20–0:50 | INTRODUCTION]\nWelcome viewers. Explain who this lesson is for and why '+topic+' matters. Tone: '+tone+'.\n\n[0:50–1:40 | FOUNDATION]\nDefine the key terms in simple language. Use a visual or on-screen example.\n\n[1:40–3:30 | STEP-BY-STEP DEMONSTRATION]\nTeach the method in numbered steps. Show each step clearly and explain why it works. Insert a verified worked example.\n\n[3:30–4:30 | COMMON MISTAKE]\nShow a likely mistake, explain why it happens, and correct it.\n\n[4:30–5:20 | PRACTICE + RECAP]\nAsk one practice question, give viewers a moment to think, then reveal the verified answer. Summarize three takeaways.\n\n[5:20–5:40 | CLOSE]\nAsk one specific comment question and point to the next related lesson.\n\nEDITOR NOTE: This is a structure draft, not a fact-checked finished script. Add real examples, sources, and your own explanation.';
+  const target=document.querySelector('#script-results');target.replaceChildren();
+  const card=document.createElement('div');card.className='card';
+  const area=document.createElement('textarea');area.className='text-input';area.rows=type==='short'?14:20;area.value=content;
+  const copy=document.createElement('button');copy.className='btn';copy.textContent='Copy script';
+  copy.addEventListener('click',async()=>{try{await navigator.clipboard.writeText(area.value);showNotice('Script draft copied.','success');}catch{area.select();showNotice('Select and copy the script manually.');}});
+  card.append(area,copy);target.append(card);
+  showNotice('Script draft created. Add verified examples and your own details before publishing.','success');
+});
+
 const videoGalleryInput=document.querySelector('#video-gallery-file');
 if(videoGalleryInput) videoGalleryInput.addEventListener('change',()=>{
   const file=videoGalleryInput.files[0];
