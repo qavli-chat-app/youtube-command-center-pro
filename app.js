@@ -243,7 +243,14 @@ if (commentsForm) commentsForm.addEventListener('submit', async event => {
         try { await api('/api/comments/' + encodeURIComponent(comment.id) + '/reply', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({text:reply.value})}); showNotice('YouTube confirmed the comment reply.', 'success'); button.disabled=true; }
         catch (error) { showNotice(error.message, 'error'); }
       });
-      card.append(author, text, reply, button); target.append(card);
+      const hide = document.createElement('button'); hide.className='btn'; hide.textContent='Reject comment';
+      hide.addEventListener('click', async () => {
+        if (!confirm('Reject this comment on YouTube? This moderation action affects the real channel.')) return;
+        if (!confirm('Confirm again: reject comment by ' + (comment.author || 'this user') + '?')) return;
+        try { await api('/api/comments/' + encodeURIComponent(comment.id) + '/moderate', {method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({moderationStatus:'rejected',confirm:true})}); showNotice('YouTube confirmed the moderation action.', 'success'); hide.disabled=true; }
+        catch (error) { showNotice(error.message, 'error'); }
+      });
+      card.append(author, text, reply, button, hide); target.append(card);
     });
   } catch (error) { target.textContent = error.message; showNotice(error.message, 'error'); }
 });
