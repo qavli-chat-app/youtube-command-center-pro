@@ -213,14 +213,23 @@ if (uploadForm) uploadForm.addEventListener('submit', async event => {
   const button = uploadForm.querySelector('button[type="submit"]');
   const file = uploadForm.querySelector('input[type="file"]').files[0];
   if (!file) { showNotice('Choose a video file first.', 'error'); return; }
-  if (!confirm('Upload this video privately to the connected YouTube channel? You can change visibility later.')) return;
+  const publishInput = document.querySelector('#publish-at-local');
+  const publishAt = publishInput && publishInput.value ? new Date(publishInput.value) : null;
+  if (publishAt && (!Number.isFinite(publishAt.getTime()) || publishAt.getTime() <= Date.now())) {
+    showNotice('Choose a future scheduled time.', 'error'); return;
+  }
+  const confirmText = publishAt
+    ? 'Upload privately and ask YouTube to publish at ' + publishAt.toLocaleString() + '? The video stays private until the scheduled time if YouTube accepts the schedule.'
+    : 'Upload this video privately to the connected YouTube channel? You can change visibility later.';
+  if (!confirm(confirmText)) return;
   const body = new FormData(uploadForm);
   body.set('privacy_status', 'private');
+  body.set('publish_at', publishAt ? publishAt.toISOString() : '');
   button.disabled = true; button.textContent = 'Uploading…';
   showNotice('Upload started. Keep this page open while the server sends the file to YouTube.');
   try {
     const result = await api('/api/videos/upload', { method: 'POST', body });
-    showNotice('YouTube confirmed upload. Video ID: ' + result.videoId + '. It is private.', 'success');
+    showNotice('YouTube confirmed upload. Video ID: ' + result.videoId + '. ' + (result.scheduledPublishAt ? 'Scheduled for ' + new Date(result.scheduledPublishAt).toLocaleString() + '.' : 'It is private.'), 'success');
     uploadForm.reset();
   } catch (error) {
     showNotice(error.message + ' Check YouTube Studio before retrying to avoid duplicates.', 'error');
