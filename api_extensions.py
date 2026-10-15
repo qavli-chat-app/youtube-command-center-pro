@@ -10,7 +10,7 @@ import tempfile
 import time
 import uuid
 from pathlib import Path
-from datetime import date
+from datetime import datetime, timezone
 from fastapi import File, Form, UploadFile
 from googleapiclient.http import MediaFileUpload
 
@@ -92,8 +92,19 @@ async def upload_video(request: Request, file: UploadFile = File(...), title: st
         raise HTTPException(status_code=400, detail="Invalid visibility.")
     if privacy_status == "public":
         raise HTTPException(status_code=400, detail="Public publishing needs a separate explicit confirmation workflow. Upload privately first.")
+    scheduled_at = None
     if publish_at:
-        raise HTTPException(status_code=400, detail="Scheduled publishing is not enabled until the persistent scheduler is configured.")
+        try:
+            scheduled_at = datetime.fromisoformat(publish_at.replace("Z", "+00:00"))
+            if scheduled_at.tzinfo is None:
+                raise ValueError("timezone required")
+            scheduled_at = scheduled_at.astimezone(timezone.utc)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Scheduled time must be an ISO 8601 date/time with a timezone.")
+        if scheduled_at <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=400, detail="Scheduled publish time must be in the future.")
+        if privacy_status != "private":
+            raise HTTPException(status_code=400, detail="YouTube scheduled publishing requires private visibility before the scheduled time.")
     try:
         parsed_tags = json.loads(tags) if tags.strip() else []
     except json.JSONDecodeError:
@@ -123,8 +134,11 @@ async def upload_video(request: Request, file: UploadFile = File(...), title: st
         with db() as con:
             con.execute("UPDATE upload_jobs SET status='uploading', updated_at=? WHERE id=?", (int(time.time()), job_id))
         yt = youtube_api(sid)
+        status_body = {"privacyStatus": "private", "selfDeclaredMadeForKids": False}
+        if scheduled_at:
+            status_body["publishAt"] = scheduled_at.isoformat().replace("+00:00", "Z")
         body = {"snippet": {"title": title.strip(), "description": description, "tags": parsed_tags[:500], "categoryId": category_id},
-                "status": {"privacyStatus": "private", "selfDeclaredMadeForKids": False}}
+                "status": status_body}
         media = MediaFileUpload(temp_path, chunksize=8 * 1024 * 1024, resumable=True, mimetype=file.content_type)
         call = yt.videos().insert(part="snippet,status", body=body, media_body=media)
         response = None
@@ -136,7 +150,8 @@ async def upload_video(request: Request, file: UploadFile = File(...), title: st
                         (video_id, int(time.time()), job_id))
         audit(sid, "video_uploaded_private", video_id)
         return {"success": True, "jobId": job_id, "videoId": video_id, "privacyStatus": "private",
-                "message": "YouTube confirmed the upload. The video was uploaded privately."}
+                "scheduledPublishAt": scheduled_at.isoformat() if scheduled_at else None,
+                "message": "YouTube confirmed the upload and scheduled its publication." if scheduled_at else "YouTube confirmed the upload. The video was uploaded privately."}
     except HTTPException as exc:
         with db() as con:
             con.execute("UPDATE upload_jobs SET status='failed', error=?, updated_at=? WHERE id=?",
