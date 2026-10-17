@@ -295,14 +295,18 @@ def auth_callback(request: Request, response: Response, state: str | None = None
     if error:
         audit(None, "oauth_cancelled", error)
         return RedirectResponse((FRONTEND_ORIGIN or "") + "/?oauth=cancelled", status_code=303)
-    cookie_state = request.cookies.get("ytcc_oauth_state")
-    if not state or not cookie_state or not secrets.compare_digest(state, cookie_state):
-        raise HTTPException(status_code=400, detail="OAuth state validation failed. Please try connecting again.")
+    # Validate the unpredictable, one-time state against the server-side store.
+    # Do not require a browser cookie here: mobile browsers and privacy settings can
+    # drop the auxiliary cookie across Google's cross-site redirect. The DB-backed
+    # state is single-use and expires after 10 minutes.
+    if not state:
+        raise HTTPException(status_code=400, detail="OAuth state is missing. Please start Connect YouTube again.")
     with db() as con:
         row = con.execute("SELECT session_id, created_at FROM oauth_states WHERE state=?", (state,)).fetchone()
-        con.execute("DELETE FROM oauth_states WHERE state=?", (state,))
+        if row:
+            con.execute("DELETE FROM oauth_states WHERE state=?", (state,))
     if not row or int(time.time()) - row["created_at"] > 600:
-        raise HTTPException(status_code=400, detail="OAuth request expired. Please connect again.")
+        raise HTTPException(status_code=400, detail="OAuth request expired or was already used. Please start Connect YouTube again.")
     flow = flow_for(state)
     try:
         flow.fetch_token(authorization_response=str(request.url))
